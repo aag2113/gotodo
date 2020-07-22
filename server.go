@@ -1,36 +1,25 @@
 package main
 
-import "fmt"
-import "strings"
-import "sync"
-import "time"
-import "encoding/json"
-import "io/ioutil"
-import "net/http"
+import (
+	"fmt"
+	"strings"
+	"sync"
+	"time"
+	
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
 
-type Task struct {
-	ID					string 		`json:"id"`
-	Title				string 		`json:"title"`
-	CreatedAt			time.Time	`json:"createdAt"`
-	CompletedAt			time.Time	`json:"completedAt"`
-	Status				string		`json:"status"`
-}
+	"gotodo/db"
+)
 
 type taskHandlers struct {
 	sync.Mutex
-	store map[string]Task
+	store map[string]db.Task
 }	
 
 func (h *taskHandlers) get(w http.ResponseWriter, r *http.Request) {
-	tasks := make([]Task, len(h.store))
-
-	h.Lock()
-	i := 0
-	for _, task := range h.store {
-		tasks[i] = task
-		i++
-	}
-	h.Unlock()
+	tasks, err := db.GetAllTasks()
 
 	jsonBytes, err := json.Marshal(tasks)
 	if err != nil{
@@ -45,7 +34,6 @@ func (h *taskHandlers) get(w http.ResponseWriter, r *http.Request) {
 
 func (h *taskHandlers) post(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := ioutil.ReadAll(r.Body)
-	defer r.Body.Close()
 	if err != nil{
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -59,7 +47,7 @@ func (h *taskHandlers) post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var task Task
+	var task db.Task
 	err = json.Unmarshal(bodyBytes, &task)
 	if err != nil{
 		w.WriteHeader(http.StatusBadRequest)
@@ -75,10 +63,27 @@ func (h *taskHandlers) post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.Lock()
-	h.store[task.ID] = task
+	var t db.Task
+	t, err = db.CreateTask(task)
+	fmt.Println(t)
+	if err != nil{
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	defer r.Body.Close()
 	defer h.Unlock()
+
+	jsonBytes, err := json.Marshal(task)
+	if err != nil{
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
 	w.Header().Add("content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	w.Write(jsonBytes)
 }
 
 func (h *taskHandlers) getTask(w http.ResponseWriter, r *http.Request) {
@@ -89,9 +94,9 @@ func (h *taskHandlers) getTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.Lock()
-	task, ok := h.store[url_parts[2]]
+	task, err := db.GetTask(url_parts[2])
 	h.Unlock()
-	if !ok {
+	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -114,14 +119,6 @@ func (h *taskHandlers) updateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Lock()
-	_, ok := h.store[url_parts[2]]
-	h.Unlock()
-	if !ok {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	defer r.Body.Close()
 	if err != nil{
@@ -137,7 +134,7 @@ func (h *taskHandlers) updateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var task Task
+	var task db.Task
 	err = json.Unmarshal(bodyBytes, &task)
 	if err != nil{
 		w.WriteHeader(http.StatusBadRequest)
@@ -152,10 +149,17 @@ func (h *taskHandlers) updateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.Lock()
-	h.store[task.ID] = task
+	task, err = db.UpdateTask(task)
 	defer h.Unlock()
+	jsonBytes, err := json.Marshal(task)
+	if err != nil{
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
 	w.Header().Add("content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	w.Write(jsonBytes)
 }
 
 
@@ -192,11 +196,14 @@ func (h *taskHandlers) task(w http.ResponseWriter, r *http.Request){
 
 func newTaskHandlers() *taskHandlers {
 	return &taskHandlers{
-		store: map[string]Task{},
+		store: map[string]db.Task{},
 	}
 }
 
 func main() {
+	db.Load()
+	defer db.Kill()
+
 	taskHandlers := newTaskHandlers()
 	http.HandleFunc("/tasks", taskHandlers.tasks)
 	http.HandleFunc("/tasks/", taskHandlers.task)

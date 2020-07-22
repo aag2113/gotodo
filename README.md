@@ -8,6 +8,10 @@ Simple "To Do" application API written in Golang
 `PUT /tasks/{task.ID}`
 
 ## TODO
-- [ ] DB Persistence
-- [ ] Deployment
-- [ ] Bulk Operations
+- [ ] Deployments
+    - [x] dockerize app
+    - [x] dockerize db
+    - [ ] dockerize nginx
+    - [ ] deploy to server
+- [ ] Bulk Ops
+- [ ] Tests

@@ -31,15 +31,17 @@ func Load() {
 		if err != nil {
 			time.Sleep(5 * time.Second)
 			cnt++
+			continue
+		}
+
+		err = DataBase.Ping()
+		if err != nil {
+			time.Sleep(5 * time.Second)
+			cnt++
 		} else {
 			cnt = 100
 		}
 	}
-	if err != nil {
-		panic(err)
-	}
-
-	err = DataBase.Ping()
 	if err != nil {
 		panic(err)
 	}

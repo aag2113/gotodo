@@ -30,9 +30,8 @@ func GetTask(id string) (Task, error) {
 	var err error
 	var task Task
 	err = DataBase.QueryRow(sql, id).Scan(&task.ID, &task.Title, &task.CreatedAt, &task.Status)
-	// TODO: Handle 404
 	if err != nil {
-		panic(err)
+		return task, err
 	}
 	return task, err
 }
@@ -70,9 +69,8 @@ func UpdateTask(t Task) (Task, error) {
 	RETURNING id, title, created_at, status`
 	var err error
 	err = DataBase.QueryRow(sql, t.ID, t.Title, t.Status).Scan(&t.ID, &t.Title, &t.CreatedAt, &t.Status)
-	// TODO: Handle 404
 	if err != nil {
-		panic(err)
+		return t, err
 	}
 	return t, err
 }

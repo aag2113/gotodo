@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+  db:
+    image: postgres
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+  app:
+    build: .
+    command: go run server.go
+    volumes:
+      - .:/go/src/gotodo
+    working_dir: /go/src/gotodo
+    ports:
+      - "8000:8080"
+    depends_on:
+      - db
